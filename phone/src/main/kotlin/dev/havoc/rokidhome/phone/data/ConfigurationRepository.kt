@@ -27,24 +27,11 @@ class ConfigurationRepository(private val database: AppDatabase) {
         if (dao.pages().isEmpty()) installStarterConfiguration()
     }
 
-    /** Installs a neutral guide and removes starter content shipped by older builds. */
+    /** Installs a neutral guide without deleting configuration from older builds. */
     suspend fun installStarterConfiguration(
         restoreMissingStarterContent: Boolean = true,
     ): Boolean = database.withTransaction {
         var changed = false
-
-        dao.pages()
-            .filter { it.page.id.startsWith(LEGACY_STARTER_PREFIX) && it.page.id != STARTER_GUIDE_PAGE_ID }
-            .forEach {
-                dao.deletePage(it.page.id)
-                changed = true
-            }
-        dao.rules()
-            .filter { it.id.startsWith(LEGACY_STARTER_PREFIX) }
-            .forEach {
-                dao.deleteRule(it.id)
-                changed = true
-            }
 
         val remainingPages = dao.pages()
         if (
@@ -340,7 +327,6 @@ class ConfigurationRepository(private val database: AppDatabase) {
     companion object {
         fun encodeSource(source: ValueSource) = CanonicalData.json.encodeToString(ValueSource.serializer(), source)
         fun decodeSource(value: String) = CanonicalData.json.decodeFromString(ValueSource.serializer(), value)
-        private const val LEGACY_STARTER_PREFIX = "starter-"
         private const val STARTER_GUIDE_PAGE_ID = "starter-guide-v1"
         private const val STARTER_CONNECTION_WIDGET_ID = "starter-guide-connection-v1"
         private const val STARTER_DASHBOARD_WIDGET_ID = "starter-guide-dashboard-v1"

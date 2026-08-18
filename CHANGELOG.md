@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Preserve dashboards and context rules inherited from older releases even when their
+  internal IDs use the legacy `starter-` prefix.
+- Prevent the setup-guide migration from replacing an existing legacy dashboard before
+  settings export.
+
 ## 0.2.2
 
 - Add password-encrypted portable export and import for Home Assistant credentials,

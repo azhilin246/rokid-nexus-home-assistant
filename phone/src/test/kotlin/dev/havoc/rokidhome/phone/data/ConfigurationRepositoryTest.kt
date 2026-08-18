@@ -7,7 +7,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,36 +50,40 @@ class ConfigurationRepositoryTest {
         database.close()
     }
 
-    @Test fun cleanupRemovesOldStarterContentButKeepsUserContent() = runBlocking {
+    @Test fun starterMigrationPreservesLegacyDashboardsAndRules() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         val dao = database.configurationDao()
-        dao.putPage(PageEntity("starter-old-v1", "Old starter", 0))
-        dao.putWidget(WidgetEntity("starter-old-widget-v1", "starter-old-v1", "STATUS", 0))
+        dao.putPage(PageEntity("starter-work-v1", "Работа", 0))
+        dao.putWidget(WidgetEntity("starter-work-widget-v1", "starter-work-v1", "STATUS", 0))
         dao.putPage(PageEntity("page-user", "User page", 1))
-        dao.putRule(ContextRuleEntity("starter-old-rule-v1", true, "{{ true }}", "starter-old-v1", 1, 0, 0, 0))
+        dao.putRule(ContextRuleEntity("starter-work-rule-v1", true, "{{ true }}", "starter-work-v1", 1, 0, 0, 0))
         val repository = ConfigurationRepository(database)
 
-        assertTrue(repository.installStarterConfiguration(restoreMissingStarterContent = false))
+        assertFalse(repository.installStarterConfiguration(restoreMissingStarterContent = false))
 
         val published = repository.publish().getOrThrow()
-        assertEquals(listOf("page-user"), published.pages.map { it.id })
-        assertTrue(published.contextRules.isEmpty())
+        assertEquals(listOf("starter-work-v1", "page-user"), published.pages.map { it.id })
+        assertEquals(listOf("starter-work-rule-v1"), published.contextRules.map { it.id })
+        val backup = repository.exportBackup()
+        assertEquals(listOf("starter-work-v1", "page-user"), backup.pages.map { it.id })
+        assertEquals(listOf("starter-work-rule-v1"), backup.contextRules.map { it.id })
         database.close()
     }
 
-    @Test fun cleanupLeavesAUsableGuideWhenOnlyOldStarterContentExists() = runBlocking {
+    @Test fun starterMigrationDoesNotReplaceLegacyOnlyDashboardWithGuide() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         val dao = database.configurationDao()
-        dao.putPage(PageEntity("starter-old-v1", "Old starter", 0))
+        dao.putPage(PageEntity("starter-tv-v1", "Телевизор", 0))
+        dao.putWidget(WidgetEntity("starter-tv-widget-v1", "starter-tv-v1", "STATUS", 0))
         val repository = ConfigurationRepository(database)
 
-        assertTrue(repository.installStarterConfiguration(restoreMissingStarterContent = false))
+        assertFalse(repository.installStarterConfiguration(restoreMissingStarterContent = false))
 
         val published = repository.publish().getOrThrow()
-        assertEquals(listOf("starter-guide-v1"), published.pages.map { it.id })
-        assertNull(published.pages.single().widgets.singleOrNull { it.action != null })
+        assertEquals(listOf("starter-tv-v1"), published.pages.map { it.id })
+        assertEquals(listOf("starter-tv-widget-v1"), published.pages.single().widgets.map { it.id })
         database.close()
     }
 
